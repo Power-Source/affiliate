@@ -2631,14 +2631,15 @@ class affiliateadmin {
 						<td class="affiliate-type"><?php
 							$order_label = __( 'Bestellung#', 'affiliate' ) . ' ' . $compete_record->area_id;
 							if ( ( $compete_record->affiliatearea == 'paid:marketpress' ) && ( ! empty( $compete_record->area_id ) ) ) {
-								if ( ( ! isset( $_GET['page'] ) ) || ( $_GET['page'] != 'marketpress-orders' ) ) {
-									global $mp;
-									if ( isset( $mp ) ) {
-										echo '<a title="' . __( 'Bestell Details ansehen', 'affiliate' ) . '" href="' .
-										     admin_url( 'edit.php?post_type=product&page=marketpress-orders&order_id=' . $compete_record->area_id ) . '">' . $order_label . ' ' . $compete_record->area_id . '</a>';
+								$order_id = absint( $compete_record->area_id );
+								if ( $order_id > 0 ) {
+									if ( isset( $compete_record->meta['blog_id'] ) ) {
+										$order_href = get_admin_url( $compete_record->meta['blog_id'], 'post.php?post=' . $order_id . '&action=edit' );
 									} else {
-										echo $order_label;
+										$order_href = admin_url( 'post.php?post=' . $order_id . '&action=edit' );
 									}
+									echo '<a title="' . __( 'Bestell Details ansehen', 'affiliate' ) . '" href="' .
+									     $order_href . '">' . $order_label . '</a>';
 								} else {
 									echo $order_label;
 								}
@@ -3011,14 +3012,14 @@ class affiliateadmin {
 								if ( ( ( $record->affiliatearea == 'paid:marketpress' ) || ( $record->affiliatearea == 'marketpress' ) ) && ( ! empty( $record->area_id ) ) ) {
 									_e( 'MarketPress', 'affiliate' );
 									//echo "meta<pre>"; print_r(unserialize($record->meta)); echo "</pre>";
-									global $mp;
-									if ( ( isset( $mp ) ) && ( current_user_can( 'edit_others_posts' ) ) ) {
+									$order_id = absint( $record->area_id );
+									if ( $order_id > 0 && current_user_can( 'edit_others_posts' ) ) {
 										if ( isset( $record->meta['blog_id'] ) ) {
-											$order_href = get_admin_url( $record->meta['blog_id'], 'edit.php?post_type=product&page=marketpress-orders&order_id=' . $record->area_id );
+											$order_href = get_admin_url( $record->meta['blog_id'], 'post.php?post=' . $order_id . '&action=edit' );
 										} else {
-											$order_href = admin_url( 'edit.php?post_type=product&page=marketpress-orders&order_id=' . $record->area_id );
+											$order_href = admin_url( 'post.php?post=' . $order_id . '&action=edit' );
 										}
-										echo ' <a title="' . __( 'Bestell Details ansehen', 'affiliate' ) . '" href="' . $order_href . '">' . __( 'Bestellung#', 'affiliate' ) . ' ' . $record->area_id . '</a>';
+										echo ' <a title="' . __( 'Bestell Details ansehen', 'affiliate' ) . '" href="' . $order_href . '">' . __( 'Bestellung#', 'affiliate' ) . ' ' . $order_id . '</a>';
 									} else {
 										echo ' ' . __( 'Bestellung#:', 'affiliate' ) . ' ' . $record->area_id;
 									}

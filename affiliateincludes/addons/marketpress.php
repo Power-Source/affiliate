@@ -8,8 +8,26 @@ Depends: marketpress/marketpress.php
 Class: MarketPress
 */
 
-// Register actions only if MarketPress is active.
-if ( affiliate_is_plugin_active( 'marketpress/marketpress.php' ) || affiliate_is_plugin_active_for_network( 'marketpress/marketpress.php' ) ) {
+// Register actions only if a compatible MarketPress plugin slug is active.
+$affiliate_mp_slugs = array(
+	'marketpress/marketpress.php',
+);
+
+if ( function_exists( 'mp_get_plugin_slug' ) ) {
+	$affiliate_mp_slugs[] = mp_get_plugin_slug();
+}
+
+$affiliate_mp_slugs = array_unique( array_filter( $affiliate_mp_slugs ) );
+
+$affiliate_mp_active = false;
+foreach ( $affiliate_mp_slugs as $affiliate_mp_slug ) {
+	if ( affiliate_is_plugin_active( $affiliate_mp_slug ) || affiliate_is_plugin_active_for_network( $affiliate_mp_slug ) ) {
+		$affiliate_mp_active = true;
+		break;
+	}
+}
+
+if ( $affiliate_mp_active ) {
 
 	add_action( 'mp_shipping_process', 'affiliate_marketpress_record_order' );
 	add_action( 'mp_order_paid', 'affiliate_marketpress_paid_order' );
@@ -107,7 +125,7 @@ function aff_mp3_paid_order( MP_Order $order ) {
 	);
 
 	// run the standard affiliate action to do the recording and assigning
-	$note = __( 'Partnerprogramm Zahlung für MarketPress Bestellung.', 'affiliate)' );
+	$note = __( 'Partnerprogramm Zahlung für MarketPress Bestellung.', 'affiliate' );
 	do_action( 'affiliate_purchase', $user_id, $amount, 'paid:marketpress', $order->ID, $note, $meta );
 
 	// record the amount paid / assigned in the meta for the order
@@ -123,9 +141,25 @@ function aff_mp3_record_order( $order ) {
 }
 
 function aff_mp_addon_add_metabox() {
-	$metabox = new WPMUDEV_Metabox( array(
+	$metabox_class = '';
+	if ( class_exists( 'PSOURCE_Metabox' ) ) {
+		$metabox_class = 'PSOURCE_Metabox';
+	} elseif ( class_exists( 'WPMUDEV_Metabox' ) ) {
+		$metabox_class = 'WPMUDEV_Metabox';
+	}
+
+	if ( empty( $metabox_class ) ) {
+		return;
+	}
+
+	$metabox = new $metabox_class( array(
 		'id'          => 'aff-mp-addon-commission',
-		'page_slugs'  => array( 'shop-einstellungen-payments', 'shop-einstellungen_page_shop-einstellungen-payments' ),
+		'page_slugs'  => array(
+			'store-settings-payments',
+			'store-settings_page_store-settings-payments',
+			'shop-einstellungen-payments',
+			'shop-einstellungen_page_shop-einstellungen-payments',
+		),
 		'title'       => __( 'Partnerprogramm Einstellungen', 'mp' ),
 		'option_name' => 'affiliate_mp_percentage',
 		'order'       => 99,
@@ -244,7 +278,7 @@ function affiliate_marketpress_paid_order( $order ) {
 		);
 
 		// run the standard affiliate action to do the recording and assigning
-		$note = __( 'Partnerprogramm Zahlung für MarketPress Bestellung.', 'affiliate)' );
+		$note = __( 'Partnerprogramm Zahlung für MarketPress Bestellung.', 'affiliate' );
 		do_action( 'affiliate_purchase', $affiliate_user_id, $amount, 'paid:marketpress', $order->ID, $note, $meta );
 
 		// record the amount paid / assigned in the meta for the order
