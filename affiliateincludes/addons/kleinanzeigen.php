@@ -45,11 +45,14 @@ function cf_affiliate_credit_purchase( $affiliate_settings, $user_id, $order_id,
 	}
 
 	$pay_future = ! empty( $affiliate_settings['cf_credit_pay_future'] );
-	if ( ! $pay_future && 'yes' === $credit_paid ) {
+	$is_future_purchase = ( 'yes' === $credit_paid );
+	if ( ! $pay_future && $is_future_purchase ) {
 		return;
 	}
 
 	$commissions = isset( $affiliate_settings['cf_credit_commissions'] ) && is_array( $affiliate_settings['cf_credit_commissions'] ) ? $affiliate_settings['cf_credit_commissions'] : array();
+	$future_commissions = isset( $affiliate_settings['cf_credit_future_commissions'] ) && is_array( $affiliate_settings['cf_credit_future_commissions'] ) ? $affiliate_settings['cf_credit_future_commissions'] : array();
+	$active_commissions = $is_future_purchase ? $future_commissions : $commissions;
 	$total_amount = 0;
 	$package_notes = array();
 	$paid_packages = array();
@@ -59,12 +62,12 @@ function cf_affiliate_credit_purchase( $affiliate_settings, $user_id, $order_id,
 		$quantity = isset( $credit_package['quantity'] ) ? absint( $credit_package['quantity'] ) : 1;
 		$label = isset( $credit_package['label'] ) ? sanitize_text_field( $credit_package['label'] ) : '';
 
-		if ( $product_id <= 0 || $quantity <= 0 || empty( $commissions[ $product_id ] ) ) {
+		if ( $product_id <= 0 || $quantity <= 0 || empty( $active_commissions[ $product_id ] ) ) {
 			continue;
 		}
 
 		$commission = cf_affiliate_calculate_commission(
-			$commissions[ $product_id ],
+			$active_commissions[ $product_id ],
 			isset( $credit_package['price'] ) ? $credit_package['price'] : 0,
 			$quantity
 		);
@@ -79,7 +82,8 @@ function cf_affiliate_credit_purchase( $affiliate_settings, $user_id, $order_id,
 			'label'      => $label,
 			'quantity'   => $quantity,
 			'commission' => number_format( $commission, 2, '.', '' ),
-			'rule'       => $commissions[ $product_id ],
+			'rule'       => $active_commissions[ $product_id ],
+			'purchase_stage' => $is_future_purchase ? 'future' : 'initial',
 		);
 	}
 
@@ -99,7 +103,7 @@ function cf_affiliate_credit_purchase( $affiliate_settings, $user_id, $order_id,
 		'IP'                 => ( isset( $_SERVER['HTTP_X_FORWARD_FOR'] ) ) ? esc_attr( $_SERVER['HTTP_X_FORWARD_FOR'] ) : esc_attr( $_SERVER['REMOTE_ADDR'] ),
 	);
 
-	$note = __( 'Kleinanzeigen Credit-Paket', 'affiliate' );
+	$note = $is_future_purchase ? __( 'Kleinanzeigen Credit-Paket Folgekauf', 'affiliate' ) : __( 'Kleinanzeigen Credit-Paket', 'affiliate' );
 	if ( ! empty( $package_notes ) ) {
 		$note .= ': ' . implode( ', ', $package_notes );
 	}
@@ -188,6 +192,7 @@ function cf_affiliate_settings( $affiliate_settings ) {
 	$credit_packages = isset( $affiliate_settings['credit_packages'] ) && is_array( $affiliate_settings['credit_packages'] ) ? $affiliate_settings['credit_packages'] : array();
 	$costs = isset( $affiliate_settings['cost'] ) && is_array( $affiliate_settings['cost'] ) ? $affiliate_settings['cost'] : array();
 	$commissions = isset( $costs['cf_credit_commissions'] ) && is_array( $costs['cf_credit_commissions'] ) ? $costs['cf_credit_commissions'] : array();
+	$future_commissions = isset( $costs['cf_credit_future_commissions'] ) && is_array( $costs['cf_credit_future_commissions'] ) ? $costs['cf_credit_future_commissions'] : array();
 	$one_time_rule = isset( $costs['cf_one_time_commission'] ) && is_array( $costs['cf_one_time_commission'] ) ? $costs['cf_one_time_commission'] : array();
 	$pay_future = ! empty( $costs['cf_credit_pay_future'] );
 	?>
@@ -223,6 +228,8 @@ function cf_affiliate_settings( $affiliate_settings ) {
 					<span class="description"><?php _e( 'Wenn deaktiviert, wird nur der erste erfolgreiche Kauf eines Kleinanzeigen-Credit-Pakets provisioniert.', 'affiliate' ); ?></span>
 					<br />
 					<span class="description"><?php _e( 'Bei Prozent wird der Wert auf den Paket- oder Einmalzahlungs-Preis angewendet. Bei Festbetrag gilt der Betrag pro gekauftem Paket bzw. pro Einmalzahlung.', 'affiliate' ); ?></span>
+					<br />
+					<span class="description"><?php _e( 'Wenn Folgekaeufe aktiv sind, kannst du dafuer je Credit-Paket einen eigenen Wert hinterlegen, z. B. Erstkauf 5 % und Folgekauf 2 %.', 'affiliate' ); ?></span>
 				</td>
 			</tr>
 			<tr>
@@ -245,6 +252,7 @@ function cf_affiliate_settings( $affiliate_settings ) {
 					$credits = isset( $credit_package['credits'] ) ? absint( $credit_package['credits'] ) : 0;
 					$price = isset( $credit_package['price'] ) ? $credit_package['price'] : '0.00';
 					$current_rule = isset( $commissions[ $product_id ] ) && is_array( $commissions[ $product_id ] ) ? $commissions[ $product_id ] : array();
+					$current_future_rule = isset( $future_commissions[ $product_id ] ) && is_array( $future_commissions[ $product_id ] ) ? $future_commissions[ $product_id ] : array();
 					?>
 					<tr>
 						<td>
@@ -258,7 +266,17 @@ function cf_affiliate_settings( $affiliate_settings ) {
 							</select>
 							<input type="text" id="cf_credit_commissions_<?php echo esc_attr( $product_id ); ?>" name="cf_credit_commission_value[<?php echo esc_attr( $product_id ); ?>]" value="<?php echo esc_attr( isset( $current_rule['value'] ) ? $current_rule['value'] : '' ); ?>" class="small-text" placeholder="5.00" />
 							<span class="cf-affiliate-unit description"><?php echo ( isset( $current_rule['mode'] ) && 'percent' === $current_rule['mode'] ) ? '%' : 'EUR'; ?></span>
-							<span class="description"><?php _e( 'Provision fuer dieses Credit-Paket.', 'affiliate' ); ?></span>
+							<span class="description"><?php _e( 'Provision fuer den ersten Kauf dieses Credit-Pakets.', 'affiliate' ); ?></span>
+							<?php if ( $pay_future ) : ?>
+								<br /><br />
+								<select name="cf_credit_future_commission_mode[<?php echo esc_attr( $product_id ); ?>]">
+									<option value="fixed" <?php selected( empty( $current_future_rule['mode'] ) ? 'fixed' : $current_future_rule['mode'], 'fixed' ); ?>><?php _e( 'Festbetrag', 'affiliate' ); ?></option>
+									<option value="percent" <?php selected( empty( $current_future_rule['mode'] ) ? 'fixed' : $current_future_rule['mode'], 'percent' ); ?>><?php _e( 'Prozent', 'affiliate' ); ?></option>
+								</select>
+								<input type="text" name="cf_credit_future_commission_value[<?php echo esc_attr( $product_id ); ?>]" value="<?php echo esc_attr( isset( $current_future_rule['value'] ) ? $current_future_rule['value'] : '' ); ?>" class="small-text" placeholder="2.00" />
+								<span class="cf-affiliate-unit description"><?php echo ( isset( $current_future_rule['mode'] ) && 'percent' === $current_future_rule['mode'] ) ? '%' : 'EUR'; ?></span>
+								<span class="description"><?php _e( 'Provision fuer Folgekaeufe dieses Credit-Pakets.', 'affiliate' ); ?></span>
+							<?php endif; ?>
 						</td>
 					</tr>
 				<?php endforeach; ?>
