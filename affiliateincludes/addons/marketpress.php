@@ -87,6 +87,10 @@ function aff_mp3_show_metabox( $post ) {
 function aff_mp3_paid_order( MP_Order $order ) {
 	global $affiliate, $wpdb;
 
+	if ( ! apply_filters( 'affiliate_marketpress_should_process_order', true, $order ) ) {
+		return;
+	}
+
 	$user_id = get_post_meta( $order->ID, 'aff_user_id', true );
 	if ( ! $user_id ) {
 		return;
@@ -210,6 +214,10 @@ function affiliate_marketpress_record_order() {
 // Paid order is a complete
 function affiliate_marketpress_paid_order( $order ) {
 	global $blog_id, $site_id;
+
+	if ( ! apply_filters( 'affiliate_marketpress_should_process_order', true, $order ) ) {
+		return;
+	}
 
 	//echo "order<pre>"; print_r($order); echo "</pre>";
 
