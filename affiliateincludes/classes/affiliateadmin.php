@@ -2362,13 +2362,14 @@ class affiliateadmin {
 						}
 						//echo "[". $plugin_data['Name'] ."] PLUGINS_CAN_BE_ACTIVE[". $PLUGINS_CAN_BE_ACTIVE ."]<br />";
 
-						// Set the initial active
 						$PLUGIN_INSTALLED = true;
+						$DEPENDENCY_ACTIVE = true;
 						if ( ( ! isset( $plugin_data['Depends'] ) ) || ( empty( $plugin_data['Depends'] ) ) ) {
 							$plugin_data['Network'] = array();
 							if ( ( isset( $plugin_data['Class'] ) ) && ( ! empty( $plugin_data['Class'] ) ) ) {
 								if ( ! class_exists( $plugin_data['Class'] ) ) {
 									$PLUGIN_INSTALLED = false;
+									$DEPENDENCY_ACTIVE = false;
 								}
 							}
 
@@ -2376,16 +2377,15 @@ class affiliateadmin {
 							$depends = explode( ',', $plugin_data['Depends'] );
 							if ( ( $depends ) && ( is_array( $depends ) ) && ( count( $depends ) ) ) {
 								foreach ( $depends as $depend ) {
-									//echo "depend[". $depend ."]<br />";
-									if ( ( ! affiliate_is_plugin_active( $depend ) ) && ( ! affiliate_is_plugin_active_for_network( $depend ) ) ) {
-										if ( ( isset( $plugin_data['Class'] ) ) || ( ! empty( $plugin_data['Class'] ) ) ) {
-											//echo "class[". $plugin_data['Class'] ."]<br />";
-											if ( ! class_exists( $plugin_data['Class'] ) ) {
-												$PLUGIN_INSTALLED = false;
-											}
-										} else {
-											$PLUGIN_INSTALLED = false;
-										}
+									$depend = trim( $depend );
+									$class_loaded = ! empty( $plugin_data['Class'] ) && class_exists( $plugin_data['Class'] );
+
+									if ( ! affiliate_is_plugin_installed( $depend ) && ! $class_loaded ) {
+										$PLUGIN_INSTALLED = false;
+									}
+
+									if ( ! affiliate_is_plugin_active( $depend ) && ! affiliate_is_plugin_active_for_network( $depend ) && ! $class_loaded ) {
+										$DEPENDENCY_ACTIVE = false;
 									}
 								}
 							}
@@ -2403,7 +2403,7 @@ class affiliateadmin {
 						<tr valign="middle" class="alternate" id="plugin-<?php echo $plugin; ?>">
 							<th class="check-column" scope="row">
 								<?php
-								if ( ( $PLUGINS_CAN_BE_ACTIVE ) && ( $PLUGIN_INSTALLED ) ) {
+								if ( ( $PLUGINS_CAN_BE_ACTIVE ) && ( $PLUGIN_INSTALLED ) && ( $DEPENDENCY_ACTIVE ) ) {
 									?><input type="checkbox" value="<?php echo esc_attr( $plugin ); ?>"
 									         name="plugincheck[]"><?php
 								}
@@ -2413,8 +2413,9 @@ class affiliateadmin {
 								<strong><?php echo esc_html( $plugin_data['Name'] ) ?></strong>
 								<?php
 								if ( ! $PLUGIN_INSTALLED ) {
-									//echo ' <span>'. __('Basis-Plugin nicht aktiviert/installiert', 'affiliate') .'</span>';
 									echo ' -- <strong>' . __( 'Plugin nicht installiert', 'affiliate' ) . '</strong>';
+								} elseif ( ! $DEPENDENCY_ACTIVE ) {
+									echo ' -- <strong>' . __( 'Installiert, aber nicht aktiv', 'affiliate' ) . '</strong>';
 								}
 
 								if ( ! empty( $plugin_data['Description'] ) ) {
@@ -2425,7 +2426,7 @@ class affiliateadmin {
 								//	echo '<br /><strong>' .__('Network only - Requires Partnerprogramm plugin is Network Activated', 'affiliate') .'</strong>';
 								//}
 
-								if ( ( $PLUGINS_CAN_BE_ACTIVE ) && ( $PLUGIN_INSTALLED ) ) {
+								if ( ( $PLUGINS_CAN_BE_ACTIVE ) && ( $PLUGIN_INSTALLED ) && ( $DEPENDENCY_ACTIVE ) ) {
 									$actions = array();
 									if ( in_array( $plugin, $active ) ) {
 										$actions['toggle'] = "<span class='edit activate'><a href='" . wp_nonce_url( "?page=" . $page . "&amp;subpage=" . $subpage . "&amp;action=deactivate&amp;addon=" . $plugin . "", 'toggle-addon-' . $plugin ) . "'>" . __( 'Deaktivieren', 'affiliate' ) . "</a></span>";
@@ -2441,12 +2442,14 @@ class affiliateadmin {
 							</td>
 							<td class="column-active">
 								<?php
-								if ( ( $PLUGINS_CAN_BE_ACTIVE ) && ( $PLUGIN_INSTALLED ) ) {
+								if ( ( $PLUGINS_CAN_BE_ACTIVE ) && ( $PLUGIN_INSTALLED ) && ( $DEPENDENCY_ACTIVE ) ) {
 									if ( in_array( $plugin, $active ) ) {
 										echo "<strong>" . __( 'Aktiv', 'affiliate' ) . "</strong>";
 									} else {
 										echo __( 'Inaktiv', 'affiliate' );
 									}
+								} elseif ( $PLUGIN_INSTALLED && ! $DEPENDENCY_ACTIVE ) {
+									echo __( 'Basis-Plugin inaktiv', 'affiliate' );
 								}
 								?>
 							</td>

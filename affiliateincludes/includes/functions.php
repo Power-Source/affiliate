@@ -25,6 +25,16 @@ function affiliate_is_plugin_active($plugin = 'affiliate/affiliate.php') {
 		return false;
 }
 
+function affiliate_is_plugin_installed( $plugin ) {
+	if ( empty( $plugin ) || ! defined( 'WP_PLUGIN_DIR' ) ) {
+		return false;
+	}
+
+	$plugin = ltrim( wp_normalize_path( $plugin ), '/' );
+
+	return file_exists( trailingslashit( WP_PLUGIN_DIR ) . $plugin );
+}
+
 function set_affiliate_url($base) {
 
 	global $M_affiliate_url;

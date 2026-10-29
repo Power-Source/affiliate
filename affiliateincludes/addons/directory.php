@@ -9,8 +9,12 @@ Class: Directory_Core
 
 define( 'AFF_DIRECTORY_ADDON', 1 );
 
-// Register actions only if Directory plugin is active.
-if ( affiliate_is_plugin_active( 'directory/loader.php' ) || affiliate_is_plugin_active_for_network( 'directory/loader.php' ) ) {
+add_action( 'plugins_loaded', 'dr_affiliate_register_hooks', 20 );
+
+function dr_affiliate_register_hooks() {
+	if ( ! class_exists( 'Directory_Core' ) && ! affiliate_is_plugin_active( 'directory/loader.php' ) && ! affiliate_is_plugin_active_for_network( 'directory/loader.php' ) ) {
+		return;
+	}
 
 	add_action( 'directory_set_paid_member', 'dr_affiliate_new_paid', 10, 3 );
 	add_action( 'directory_affiliate_settings', 'dr_affiliate_settings' );
@@ -69,8 +73,8 @@ function dr_affiliate_new_paid( $affiliate_settings, $user_id, $billing_type ) {
 		if ($amount > 0) {
 			//echo "amount[". $amount ."]<br />";
 		
-			$meta = array(
-				'affiliate_settings'	=>	affiliate_settings,
+            $meta = array(
+                'affiliate_settings'	=>	$affiliate_settings,
 				'user_id'				=> 	$user_id,
 				'billing_type'			=>	$billing_type,
 				'blog_id'				=>	$blog_id,

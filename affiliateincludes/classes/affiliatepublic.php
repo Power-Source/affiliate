@@ -488,11 +488,11 @@ class affiliate {
 			);
 
 			$this->db->insert( $this->affiliaterecords, array(
-				$affiliate_user_id,
-				$period,
-				'credit',
-				false,
-				false,
+				'user_id'       => $affiliate_user_id,
+				'period'        => $period,
+				'affiliatearea' => 'credit',
+				'area_id'       => false,
+				'affiliatenote' => false,
 				'amount'    => $amount,
 				'meta'      => maybe_serialize( $meta ),
 				'timestamp' => current_time( 'mysql', true )
@@ -519,11 +519,11 @@ class affiliate {
 				//'HTTP_USER_AGENT'	=>	esc_attr($_SERVER['HTTP_USER_AGENT'])
 			);
 			$this->db->insert( $this->affiliaterecords, array(
-				$affiliate_user_id,
-				$period,
-				'debit',
-				false,
-				false,
+				'user_id'       => $affiliate_user_id,
+				'period'        => $period,
+				'affiliatearea' => 'debit',
+				'area_id'       => false,
+				'affiliatenote' => false,
 				'amount'    => $amount,
 				'meta'      => maybe_serialize( $meta ),
 				'timestamp' => current_time( 'mysql', true )
@@ -637,11 +637,13 @@ class affiliate {
 				do_action( 'affiliate_referrer', $affiliate, $referrer );
 
 				// Write the affiliate hash out - valid for 30 days.
-				@setcookie( 'affiliate_' . COOKIEHASH, 'aff' . md5( AUTH_SALT . $reference ),
+				if ( ! headers_sent() ) {
+					@setcookie( 'affiliate_' . COOKIEHASH, 'aff' . md5( AUTH_SALT . $reference ),
 					( time() + ( 60 * 60 * 24 * ( (int) AFFILIATE_COOKIE_DAYS ) ) ),
 					COOKIEPATH,
 					COOKIE_DOMAIN
-				);
+					);
+				}
 
 			}
 
@@ -654,7 +656,9 @@ class affiliate {
 			// everything failed, we don't have a reference
 			if ( defined( 'AFFILIATE_SETNOCOOKIE' ) && AFFILIATE_SETNOCOOKIE == 'yes' ) {
 				// we are supposed to set a no-affiliate cookie
-				@setcookie( 'noaffiliate_' . COOKIEHASH, 'notanaff', 0, COOKIEPATH, COOKIE_DOMAIN );
+				if ( ! headers_sent() ) {
+					@setcookie( 'noaffiliate_' . COOKIEHASH, 'notanaff', 0, COOKIEPATH, COOKIE_DOMAIN );
+				}
 			}
 		}
 	}

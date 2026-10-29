@@ -87,7 +87,7 @@ function affReportReady() {
     affSetWidth();
     affDoPlot();
 
-    jQuery(window).resize(function() {
+    jQuery(window).on('resize', function() {
         affSetWidth();
         affDoPlot();
     });

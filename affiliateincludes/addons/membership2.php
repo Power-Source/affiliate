@@ -3,7 +3,7 @@
 Plugin Name: PS Mitgliedschaften
 Description: Belohne Benutzer für das Einbringen neuer Abonnements über das PSOURCE PS Mitgliedschaften-Plugin
 Author URI: https://n3rds.work/piestingtal-source-project/ps-mitglieder-plugin/
-Depends: protected-content/protected-content.php
+Depends: ps-mitgliedschaften/membership2.php
 Class: MS_Plugin
 Developer: DerN3rd
 */
