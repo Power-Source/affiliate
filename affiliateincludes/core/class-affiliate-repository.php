@@ -108,6 +108,19 @@ class Affiliate_Repository {
 		);
 	}
 
+	public function find_signup_meta_by_email( $email ) {
+		if ( empty( $this->db->signups ) ) {
+			return false;
+		}
+
+		return $this->db->get_var(
+			$this->db->prepare(
+				"SELECT meta FROM {$this->db->signups} WHERE user_email = %s LIMIT 1",
+				sanitize_email( $email )
+			)
+		);
+	}
+
 	public function has_commission( $user_id, $area, $area_id ) {
 		$count = $this->db->get_var(
 			$this->db->prepare(

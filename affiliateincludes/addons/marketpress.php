@@ -85,8 +85,6 @@ function aff_mp3_show_metabox( $post ) {
 }
 
 function aff_mp3_paid_order( MP_Order $order ) {
-	global $affiliate, $wpdb;
-
 	if ( ! apply_filters( 'affiliate_marketpress_should_process_order', true, $order ) ) {
 		return;
 	}
@@ -96,10 +94,7 @@ function aff_mp3_paid_order( MP_Order $order ) {
 		return;
 	}
 
-	$sql    = $wpdb->prepare( "SELECT count(id) FROM " . $affiliate->affiliaterecords . " WHERE user_id=%d AND affiliatearea=%s AND area_id=%d", $user_id, "paid:marketpress", $order->ID );
-	$result = $wpdb->get_var( $sql );
-	if ( $result > 0 ) {
-		//duplicate
+	if ( affiliate_has_commission_record( $user_id, 'paid:marketpress', $order->ID ) ) {
 		return;
 	}
 

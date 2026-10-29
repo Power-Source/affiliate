@@ -268,13 +268,7 @@ class affiliate {
 			if ( is_multisite() ) {
 				// If we don't have the affiliate reference then double check the signup meta info.
 
-				global $wpdb;
-
-				// the table won't exist if it isn't multisite
-
-				$sql_str = $wpdb->prepare( "SELECT meta FROM $wpdb->signups WHERE user_email = %s LIMIT 1", get_the_author_meta( 'user_email', $new_user_id ) );
-				//echo "sql_str[". $sql_str ."]<br />";
-				$signup_meta = $wpdb->get_var( $sql_str );
+				$signup_meta = $this->repository->find_signup_meta_by_email( get_the_author_meta( 'user_email', $new_user_id ) );
 				//echo "signup_meta<pre>"; print_r($signup_meta); echo "</pre>";
 
 
@@ -292,12 +286,7 @@ class affiliate {
 			//echo "affiliate_referred_id[". $affiliate_referred_id .']<br />';
 
 			// Call the affiliate action
-			$meta = array(
-				'REMOTE_URL' => esc_attr( $_SERVER['HTTP_REFERER'] ),
-				'LOCAL_URL'  => ( is_ssl() ? 'https://' : 'http://' ) . esc_attr( $_SERVER['HTTP_HOST'] ) . esc_attr( $_SERVER['REQUEST_URI'] ),
-				'IP'         => ( isset( $_SERVER['HTTP_X_FORWARD_FOR'] ) ) ? esc_attr( $_SERVER['HTTP_X_FORWARD_FOR'] ) : esc_attr( $_SERVER['REMOTE_ADDR'] ),
-				//'HTTP_USER_AGENT'	=>	esc_attr($_SERVER['HTTP_USER_AGENT'])
-			);
+			$meta = Affiliate_Request_Context::from_globals()->metadata();
 
 			$note = __( 'User', 'affiliate' );
 			do_action( 'affiliate_signup', $affiliate_referred_id, false, 'signup:user', $new_user_id, $note, $meta );
@@ -323,12 +312,7 @@ class affiliate {
 				$affiliate_user_id = intval( $new_blog_meta['affiliate_referred_by'] );
 
 				// Call the affiliate action
-				$meta = array(
-					'REMOTE_URL' => esc_attr( $_SERVER['HTTP_REFERER'] ),
-					'LOCAL_URL'  => ( is_ssl() ? 'https://' : 'http://' ) . esc_attr( $_SERVER['HTTP_HOST'] ) . esc_attr( $_SERVER['REQUEST_URI'] ),
-					'IP'         => ( isset( $_SERVER['HTTP_X_FORWARD_FOR'] ) ) ? esc_attr( $_SERVER['HTTP_X_FORWARD_FOR'] ) : esc_attr( $_SERVER['REMOTE_ADDR'] ),
-					//'HTTP_USER_AGENT'	=>	esc_attr($_SERVER['HTTP_USER_AGENT'])
-				);
+				$meta = Affiliate_Request_Context::from_globals()->metadata();
 
 				//echo "blog_details<pre>"; print_r($blog_details); echo "</pre>";
 				//echo "adding affiliate_signup<br />";
@@ -348,12 +332,7 @@ class affiliate {
 		$affiliate_user_id = $this->get_affiliate_user_id_from_hash();
 		if ( $affiliate_user_id ) {
 			// Call the affiliate action
-			$meta = array(
-				'REMOTE_URL' => esc_attr( $_SERVER['HTTP_REFERER'] ),
-				'LOCAL_URL'  => ( is_ssl() ? 'https://' : 'http://' ) . esc_attr( $_SERVER['HTTP_HOST'] ) . esc_attr( $_SERVER['REQUEST_URI'] ),
-				'IP'         => ( isset( $_SERVER['HTTP_X_FORWARD_FOR'] ) ) ? esc_attr( $_SERVER['HTTP_X_FORWARD_FOR'] ) : esc_attr( $_SERVER['REMOTE_ADDR'] ),
-				//'HTTP_USER_AGENT'	=>	esc_attr($_SERVER['HTTP_USER_AGENT'])
-			);
+			$meta = Affiliate_Request_Context::from_globals()->metadata();
 
 			$note = __( 'Blog', 'affiliate' );
 			do_action( 'affiliate_signup', $affiliate_user_id, false, 'signup:blog', $blog_id, $note, $meta );
@@ -383,7 +362,8 @@ class affiliate {
 			$area,
 			$area_id,
 			$note,
-			$meta
+			$meta,
+			false !== $area
 		);
 	}
 
@@ -397,7 +377,7 @@ class affiliate {
 			}
 		}
 
-		if ( ! $affiliate_user_id ) {
+		if ( ! $affiliate_user_id || ! is_numeric( $affiliate_user_id ) ) {
 			return false;
 		}
 
@@ -484,12 +464,13 @@ class affiliate {
 
 	function handle_affiliate_link() {
 
-		$reference = false;
-		$referrer  = '';
+		$context = Affiliate_Request_Context::from_globals();
+		$reference = $context->reference();
+		$referrer  = $context->referrer_host();
 		$affiliate = false;
 
-		if ( $this->no_affiliate_condition() ) {
-			if ( isset( $_GET['ref'] ) ) {
+		if ( $this->no_affiliate_condition( $context ) ) {
+			if ( $reference ) {
 				// redirect to the none affiliate url anyway, just to be tidy
 				$this->redirect( remove_query_arg( array( 'ref' ) ) );
 			}
@@ -499,18 +480,10 @@ class affiliate {
 
 		}
 
-		// set the reference
-		$reference = isset( $_GET['ref'] ) ? sanitize_text_field( wp_unslash( $_GET['ref'] ) ) : false;
-
-		// set the referer, if we have one
-		if ( isset( $_SERVER['HTTP_REFERER'] ) ) {
-			$referrer = parse_url( esc_attr( $_SERVER['HTTP_REFERER'] ), PHP_URL_HOST );
-		}
-
 		// we have a ref parameter in the url
 		if ( $reference ) {
 			// if a cookie doesn't exist already or we are allowed to replace it
-			if ( ( ! isset( $_COOKIE[ 'affiliate_' . COOKIEHASH ] ) ) || ( AFFILIATE_REPLACE_COOKIE == 'yes' ) ) {
+			if ( ! $context->has_affiliate_cookie() || AFFILIATE_REPLACE_COOKIE == 'yes' ) {
 				// get the affiliate user_id from the reference
 				$affiliate = $this->reference_has_user( $reference );
 			}
@@ -520,7 +493,7 @@ class affiliate {
 		// we have an affiliate
 		if ( $affiliate ) {
 			// set the cookie
-			$this->set_affiliate_cookie( $affiliate, $reference, $referrer );
+			$this->set_affiliate_cookie( $affiliate, $reference, $referrer, $context );
 			// The cookie is set so redirect to the page called but without the ref in the url
 			// for SEO reasons.
 			$this->redirect( remove_query_arg( array( 'ref' ) ) );
@@ -533,7 +506,7 @@ class affiliate {
 		// are we still supposed to continue?
 		if ( defined( 'AFFILIATE_CHECKALL' ) && AFFILIATE_CHECKALL == 'yes' ) {
 			// we still don't have a cookie, but we do have a referrer
-			if ( ! isset( $_COOKIE[ 'affiliate_' . COOKIEHASH ] ) && ! empty( $referrer ) ) {
+			if ( ! $context->has_affiliate_cookie() && ! empty( $referrer ) ) {
 				// get affiliate user_id from referer
 				$affiliate = $this->referer_has_user( $referrer );
 			}
@@ -561,9 +534,7 @@ class affiliate {
 
 				// get a valid reference for the user_id
 				$reference = get_user_meta( $affiliate, 'affiliate_reference', true );
-				// Update a quick count for this month
-				//do_action( 'affiliate_click', $affiliate);
-				do_action( 'affiliate_click', $affiliate, false, 'unique', false, false, $meta );
+				do_action( 'affiliate_click', $affiliate, false, 'unique', false, false, $context->metadata() );
 
 				// Store the referrer
 				do_action( 'affiliate_referrer', $affiliate, $referrer );
@@ -595,10 +566,12 @@ class affiliate {
 	 * To check the no_affiliate cookie
 	 * @return boolean True if the cookie is set and needs to be considered
 	 */
-	function no_affiliate_condition() {
+	function no_affiliate_condition( $context = null ) {
+		$context = $context ? $context : Affiliate_Request_Context::from_globals();
+
 		// if we are supposed to check this cookie
 		if ( defined( 'AFFILIATE_SETNOCOOKIE' ) && 'yes' == AFFILIATE_SETNOCOOKIE ) {
-			if ( isset( $_COOKIE[ 'noaffiliate_' . COOKIEHASH ] ) ) {
+			if ( $context->has_no_affiliate_cookie() ) {
 				// If there isn't a reference set then return because we don't want to do anything
 				return true;
 			}
@@ -610,30 +583,21 @@ class affiliate {
 	}
 
 	function reference_has_user( $reference ) {
-		return $this->db->get_var( $this->db->prepare( "SELECT user_id FROM {$this->db->usermeta} WHERE meta_key = 'affiliate_reference' AND meta_value='%s'", $reference ) );
+		return $this->repository->find_user_by_meta( 'affiliate_reference', $reference );
 	}
 
 	function referer_has_user( $referer ) {
-		return $this->db->get_var( $this->db->prepare( "SELECT user_id FROM {$this->db->usermeta} WHERE meta_key = 'affiliate_referrer' AND meta_value='%s'", $referer ) );
+		return $this->repository->find_user_by_meta( 'affiliate_referrer', $referer );
 	}
 
-	function set_affiliate_cookie( $affiliate, $reference, $referrer ) {
-
-		if ( ! isset( $_SERVER['HTTP_REFERER'] ) || empty( $_SERVER['HTTP_REFERER'] ) ) {
-			$_SERVER['HTTP_REFERER'] = ( isset( $_SERVER['REMOTE_ADDR'] ) ) ? $_SERVER['REMOTE_ADDR'] : '';
-		}
-		
-		$meta = array(
-			'REMOTE_URL' => esc_attr( $_SERVER['HTTP_REFERER'] ),
-			'LOCAL_URL'  => ( is_ssl() ? 'https://' : 'http://' ) . esc_attr( $_SERVER['HTTP_HOST'] ) . esc_attr( $_SERVER['REQUEST_URI'] ),
-			'IP'         => ( isset( $_SERVER['HTTP_X_FORWARD_FOR'] ) ) ? esc_attr( $_SERVER['HTTP_X_FORWARD_FOR'] ) : esc_attr( $_SERVER['REMOTE_ADDR'] ),
-			//'HTTP_USER_AGENT'	=>	esc_attr($_SERVER['HTTP_USER_AGENT'])
-		);
+	function set_affiliate_cookie( $affiliate, $reference, $referrer, $context = null ) {
+		$context = $context ? $context : Affiliate_Request_Context::from_globals();
+		$meta = $context->metadata();
 
 		// Update a quick count for this month
-		$note   = __( 'Referal', 'affiliate' ) . ' ' . esc_attr( $_SERVER['HTTP_REFERER'] );
+		$note   = __( 'Referal', 'affiliate' ) . ' ' . $meta['REMOTE_URL'];
 		$amount = apply_filters( 'affiliate_click_amount_filter', '0.00', $affiliate );
-		$amount = number_format( $amount, 2 );
+		$amount = number_format( $amount, 2, '.', '' );
 		//error_log(__FUNCTION__ .": amount[". $amount ."]");
 		do_action( 'affiliate_click', $affiliate, $amount, 'unique:click', false, $note, $meta );
 
@@ -684,38 +648,21 @@ class affiliate {
 	}
 
 	function get_complete_records( $user_id, $period = false, $area = array(), $area_id = false ) {
-		$user_id = absint( $user_id );
-		if ( ! $user_id ) {
-			return array();
-		}
-
-		$sql_str = "SELECT * FROM {$this->affiliaterecords} WHERE `user_id` = %d";
-		$sql_args = array( $user_id );
-
+		$period_value = null;
 		if ( ! empty( $period ) ) {
-			$period = sanitize_text_field( $period );
-			if ( ! preg_match( '/^\d{6}$/', $period ) ) {
+			try {
+				$period_value = Affiliate_Period::from_value( sanitize_text_field( $period ) );
+			} catch ( InvalidArgumentException $exception ) {
 				return array();
 			}
-
-			$sql_str .= ' AND `period` = %s';
-			$sql_args[] = $period;
 		}
 
-		$area = array_values( array_filter( array_map( 'sanitize_text_field', (array) $area ) ) );
-		if ( ! empty( $area ) ) {
-			$sql_str .= ' AND `affiliatearea` IN (' . implode( ', ', array_fill( 0, count( $area ), '%s' ) ) . ')';
-			$sql_args = array_merge( $sql_args, $area );
-		}
-
-		if ( ! empty( $area_id ) ) {
-			$sql_str .= ' AND `area_id` = %s';
-			$sql_args[] = sanitize_text_field( $area_id );
-		}
-
-		$sql_str .= ' LIMIT 50';
-
-		return $this->db->get_results( $this->db->prepare( $sql_str, $sql_args ) );
+		return $this->repository->find_records(
+			$user_id,
+			$period_value,
+			$area,
+			empty( $area_id ) ? null : $area_id
+		);
 	}
 
 }

@@ -79,22 +79,13 @@ function affiliate_sanitize_decimal( $value ) {
 }
 
 function affiliate_has_commission_record( $user_id, $area, $area_id ) {
-	global $affiliate, $wpdb;
+	global $affiliate;
 
-	if ( empty( $affiliate ) || empty( $affiliate->affiliaterecords ) || ! is_numeric( $user_id ) || ! is_numeric( $area_id ) ) {
+	if ( empty( $affiliate ) || ! is_callable( array( $affiliate, 'get_repository' ) ) || ! is_numeric( $user_id ) || ! is_numeric( $area_id ) ) {
 		return false;
 	}
 
-	$count = $wpdb->get_var(
-		$wpdb->prepare(
-			"SELECT COUNT(id) FROM {$affiliate->affiliaterecords} WHERE user_id = %d AND affiliatearea = %s AND area_id = %d",
-			$user_id,
-			$area,
-			$area_id
-		)
-	);
-
-	return (int) $count > 0;
+	return $affiliate->get_repository()->has_commission( $user_id, $area, $area_id );
 }
 
 function set_affiliate_url($base) {

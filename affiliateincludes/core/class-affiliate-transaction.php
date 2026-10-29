@@ -35,7 +35,7 @@ final class Affiliate_Transaction {
 		$this->area = false === $area || '' === $area ? null : (string) $area;
 		$this->area_id = false === $area_id ? null : $area_id;
 		$this->note = false === $note ? null : $note;
-		$this->meta = is_array( $meta ) ? $meta : array();
+		$this->meta = $meta;
 	}
 
 	public function type() {

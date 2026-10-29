@@ -69,13 +69,13 @@
 
 ## Phase 3: Core-Modernisierung
 
-**Status: Geplant**
+**Status: Abgeschlossen**
 
-- Datenbankzugriff in ein Repository extrahieren.
-- Transaktionsberechnung und -speicherung in einen Service verschieben.
-- Request-Verarbeitung, Geschäftslogik und HTML-Ausgabe trennen.
-- Globale Instanzen schrittweise durch klar definierte Abhängigkeiten ersetzen.
-- Einheitliche Value Objects für Geldbeträge, Perioden und Transaktionen einführen.
+- [x] Datenbankzugriff in ein Repository extrahieren.
+- [x] Transaktionsberechnung und -speicherung in einen Service verschieben.
+- [x] Request-Verarbeitung, Geschäftslogik und HTML-Ausgabe trennen.
+- [x] Globale Instanzen schrittweise durch klar definierte Abhängigkeiten ersetzen.
+- [x] Einheitliche Value Objects für Geldbeträge, Perioden und Transaktionen einführen.
 
 ## Phase 4: Integrationsarchitektur
 
@@ -97,8 +97,6 @@
 
 ## Empfohlene Reihenfolge
 
-1. Phase 1 vollständig abschließen.
-2. Phase 2 vor größeren Refactorings etablieren.
-3. Phase 3 in kleinen, testgestützten Änderungen durchführen.
-4. Integrationen aus Phase 4 einzeln migrieren.
-5. Phase 5 parallel zu den strukturellen Arbeiten ausbauen.
+1. Phasen 1 bis 3 bilden den abgeschlossenen, gehärteten und testgestützten Core.
+2. Integrationen aus Phase 4 einzeln migrieren.
+3. Phase 5 parallel zu den strukturellen Arbeiten ausbauen.

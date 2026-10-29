@@ -17,7 +17,7 @@ final class Affiliate_Money {
 			$value = str_replace( ',', '.', $value );
 		}
 
-		if ( ! is_numeric( $value ) ) {
+		if ( ! is_numeric( $value ) || ! is_finite( (float) $value ) ) {
 			throw new InvalidArgumentException( 'Affiliate money values must be numeric.' );
 		}
 

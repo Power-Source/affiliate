@@ -4,6 +4,8 @@
 
 Die geplante technische und sicherheitsbezogene Weiterentwicklung ist in der [Modernisierungsroadmap](./MODERNIZATION-ROADMAP.md) dokumentiert.
 
+Der Aufbau des modernisierten Transaktionskerns ist in der [Core-Architektur](./ARCHITECTURE.md) beschrieben.
+
 ## Automatisierte Tests
 
 Die Integrationstests verwenden PHPUnit und die offizielle WordPress-Test-Suite mit einer separaten, ausschließlich für Tests bestimmten Datenbank.
