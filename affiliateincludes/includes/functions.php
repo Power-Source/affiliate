@@ -35,6 +35,68 @@ function affiliate_is_plugin_installed( $plugin ) {
 	return file_exists( trailingslashit( WP_PLUGIN_DIR ) . $plugin );
 }
 
+function affiliate_set_tracking_cookie( $name, $value, $expires = 0 ) {
+	if ( headers_sent() ) {
+		return false;
+	}
+
+	$options = array(
+		'expires'  => (int) $expires,
+		'path'     => COOKIEPATH,
+		'domain'   => COOKIE_DOMAIN,
+		'secure'   => is_ssl(),
+		'httponly' => true,
+		'samesite' => 'Lax',
+	);
+
+	if ( PHP_VERSION_ID >= 70300 ) {
+		return setcookie( $name, $value, $options );
+	}
+
+	return setcookie(
+		$name,
+		$value,
+		$options['expires'],
+		$options['path'] . '; samesite=' . $options['samesite'],
+		$options['domain'],
+		$options['secure'],
+		$options['httponly']
+	);
+}
+
+function affiliate_can_manage() {
+	return current_user_can( is_network_admin() ? 'manage_network_options' : 'manage_options' );
+}
+
+function affiliate_sanitize_period( $period ) {
+	$period = sanitize_text_field( wp_unslash( $period ) );
+
+	return preg_match( '/^\d{6}$/', $period ) ? $period : false;
+}
+
+function affiliate_sanitize_decimal( $value ) {
+	return abs( (float) str_replace( ',', '.', sanitize_text_field( wp_unslash( $value ) ) ) );
+}
+
+function affiliate_has_commission_record( $user_id, $area, $area_id ) {
+	global $affiliate, $wpdb;
+
+	if ( empty( $affiliate ) || empty( $affiliate->affiliaterecords ) || ! is_numeric( $user_id ) || ! is_numeric( $area_id ) ) {
+		return false;
+	}
+
+	$count = $wpdb->get_var(
+		$wpdb->prepare(
+			"SELECT COUNT(id) FROM {$affiliate->affiliaterecords} WHERE user_id = %d AND affiliatearea = %s AND area_id = %d",
+			$user_id,
+			$area,
+			$area_id
+		)
+	);
+
+	return (int) $count > 0;
+}
+
 function set_affiliate_url($base) {
 
 	global $M_affiliate_url;

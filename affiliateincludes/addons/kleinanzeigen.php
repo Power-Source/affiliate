@@ -140,6 +140,10 @@ function cf_affiliate_one_time_purchase( $affiliate_settings, $user_id, $order_i
 		return;
 	}
 
+	if ( affiliate_has_commission_record( $aff, 'paid:classifieds-one-time', $order_id ) ) {
+		return;
+	}
+
 	$rule = isset( $affiliate_settings['cf_one_time_commission'] ) ? $affiliate_settings['cf_one_time_commission'] : array();
 	$quantity = isset( $one_time_purchase['quantity'] ) ? absint( $one_time_purchase['quantity'] ) : 1;
 	$price = isset( $one_time_purchase['price'] ) ? $one_time_purchase['price'] : 0;

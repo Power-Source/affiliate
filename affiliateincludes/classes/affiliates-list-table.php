@@ -38,7 +38,7 @@ class Affiliates_List_Table extends WP_List_Table {
 		
 		if ( (isset($_REQUEST['blog'])) && (!empty($_REQUEST['blog'])) ) {
 			$this->filters['blog_id'] = 0;			
- 			$this->filters['blog'] = esc_attr($_REQUEST['blog']);
+ 			$this->filters['blog'] = sanitize_text_field( wp_unslash( $_REQUEST['blog'] ) );
 			
 			if (intval($this->filters['blog']) != 0) {
 				$this->filters['blog_id'] = intval($this->filters['blog']);
@@ -95,7 +95,7 @@ class Affiliates_List_Table extends WP_List_Table {
 		}
 		
 		if ( (isset($_REQUEST['s'])) && (!empty($_REQUEST['s'])) ) {
-			$this->filters['search'] = esc_attr($_REQUEST['s']);
+			$this->filters['search'] = sanitize_text_field( wp_unslash( $_REQUEST['s'] ) );
 		} else {
 			$this->filters['search'] = '';
 		}
@@ -134,9 +134,9 @@ class Affiliates_List_Table extends WP_List_Table {
 	function prepare_items() {
 		global $role, $usersearch, $blog_id;
 
-		$usersearch = isset( $_REQUEST['s'] ) ? trim( $_REQUEST['s'] ) : '';
+		$usersearch = isset( $_REQUEST['s'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['s'] ) ) : '';
 
-		$role = isset( $_REQUEST['role'] ) ? $_REQUEST['role'] : '';
+		$role = isset( $_REQUEST['role'] ) ? sanitize_key( wp_unslash( $_REQUEST['role'] ) ) : '';
 
 		$per_page = 'users_per_page';
 		$users_per_page = $this->get_items_per_page( $per_page );
@@ -178,11 +178,18 @@ class Affiliates_List_Table extends WP_List_Table {
 		if ( '' !== $args['search'] )
 			$args['search'] = '*' . $args['search'] . '*';
 
-		if ( isset( $_REQUEST['orderby'] ) )
-			$args['orderby'] = $_REQUEST['orderby'];
+		if ( isset( $_REQUEST['orderby'] ) ) {
+			$orderby = sanitize_key( wp_unslash( $_REQUEST['orderby'] ) );
+			$allowed_orderby = array( 'id', 'display_name', 'user_email', 'user_login', 'user_registered' );
+			if ( in_array( $orderby, $allowed_orderby, true ) ) {
+				$args['orderby'] = $orderby;
+			}
+		}
 
-		if ( isset( $_REQUEST['order'] ) )
-			$args['order'] = $_REQUEST['order'];
+		if ( isset( $_REQUEST['order'] ) ) {
+			$order = strtoupper( sanitize_key( wp_unslash( $_REQUEST['order'] ) ) );
+			$args['order'] = in_array( $order, array( 'ASC', 'DESC' ), true ) ? $order : 'ASC';
+		}
 
 		// Add the affiliate args
 		$args['meta_key'] = 'enable_affiliate';
@@ -240,7 +247,7 @@ class Affiliates_List_Table extends WP_List_Table {
 			$placeholder_text .= ', '. __('Domain Pfad', 'affiliate');
 		}
 		$placeholder_text .= __(' oder Mapped Domain', 'affiliate');
-		?><label for="affiliate-search-blog"><?php _e('Blog:', 'affiliate'); ?> <input size="40" type="text" id="affiliate-search-blog" name="blog" value="<?php echo esc_attr($this->filters['blog']); ?>" placeholder="<?php echo $placeholder_text; ?>" /><?php
+		?><label for="affiliate-search-blog"><?php _e('Blog:', 'affiliate'); ?> <input size="40" type="text" id="affiliate-search-blog" name="blog" value="<?php echo esc_attr($this->filters['blog']); ?>" placeholder="<?php echo esc_attr( $placeholder_text ); ?>" /><?php
 	}
 
 	function current_action() {

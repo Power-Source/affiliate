@@ -116,34 +116,7 @@ class affiliatedashboard {
 	}
 
 	function return_json($results) {
-
-		// Check for callback
-		if(isset($_GET['callback'])) {
-			// Add the relevant header
-			header('Content-type: text/javascript');
-			echo addslashes($_GET['callback']) . " (";
-		} else {
-			if(isset($_GET['pretty'])) {
-				// Will output pretty version
-				header('Content-type: text/html');
-			} else {
-				header('Content-type: application/json');
-			}
-		}
-
-		if(function_exists('json_encode')) {
-			echo json_encode($results);
-		} else {
-			// PHP4 version
-			require_once(ABSPATH."wp-includes/js/tinymce/plugins/spellchecker/classes/utils/JSON.php");
-			$json_obj = new Moxiecode_JSON();
-			echo $json_obj->encode($results);
-		}
-
-		if(isset($_GET['callback'])) {
-			echo ")";
-		}
-
+		wp_send_json( $results );
 	}
 
 	function dashboard_widget_header() {

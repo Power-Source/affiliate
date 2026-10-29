@@ -24,7 +24,7 @@ function affiliate_supporter_hooks() {
 	if( 3.5 >= $psts->version ) {
 
 		// ProSites 3.5+
-		$active_tab = ! empty( $_GET['tab'] ) ? $_GET['tab'] : 'general';
+		$active_tab = ! empty( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : 'general';
 
 		// Needs to be on active tab only
 		if ( 'affiliate' == $active_tab ) {
@@ -177,6 +177,9 @@ function affiliate_supporter_paid($bid, $periodamount, $period, $level) {
 function affiliate_supporter_settings_update( $active_tab = false ) {
 
 	if( false === $active_tab || 'affiliate' == $active_tab ) {
+		if ( ! affiliate_can_manage() ) {
+			return;
+		}
 
 		if ( function_exists( 'get_site_option' ) ) {
 			$updateoption = 'update_site_option';
@@ -184,17 +187,18 @@ function affiliate_supporter_settings_update( $active_tab = false ) {
 			$updateoption = 'update_option';
 		}
 
-		$updateoption( "supporter_1_whole_payment", $_POST['supporter_1_whole_payment'] );
-		$updateoption( "supporter_1_partial_payment", $_POST['supporter_1_partial_payment'] );
-		$updateoption( "supporter_1_payment_type", $_POST['supporter_1_payment_type'] );
+		foreach ( array( 1, 3, 12 ) as $period ) {
+			$whole_key = "supporter_{$period}_whole_payment";
+			$partial_key = "supporter_{$period}_partial_payment";
+			$type_key = "supporter_{$period}_payment_type";
+			$whole = isset( $_POST[ $whole_key ] ) ? min( 100, absint( $_POST[ $whole_key ] ) ) : 0;
+			$partial = isset( $_POST[ $partial_key ] ) ? min( 99, absint( $_POST[ $partial_key ] ) ) : 0;
+			$type = isset( $_POST[ $type_key ] ) ? sanitize_key( wp_unslash( $_POST[ $type_key ] ) ) : 'actual';
 
-		$updateoption( "supporter_3_whole_payment", $_POST['supporter_3_whole_payment'] );
-		$updateoption( "supporter_3_partial_payment", $_POST['supporter_3_partial_payment'] );
-		$updateoption( "supporter_3_payment_type", $_POST['supporter_3_payment_type'] );
-
-		$updateoption( "supporter_12_whole_payment", $_POST['supporter_12_whole_payment'] );
-		$updateoption( "supporter_12_partial_payment", $_POST['supporter_12_partial_payment'] );
-		$updateoption( "supporter_12_payment_type", $_POST['supporter_12_payment_type'] );
+			$updateoption( $whole_key, (string) $whole );
+			$updateoption( $partial_key, str_pad( (string) $partial, 2, '0', STR_PAD_LEFT ) );
+			$updateoption( $type_key, in_array( $type, array( 'actual', 'percentage' ), true ) ? $type : 'actual' );
+		}
 	}
 
 }

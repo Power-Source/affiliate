@@ -2,6 +2,20 @@
 
 **Dieses Plugin fügt Deiner Seite ein einfaches Affiliate-System hinzu. Verfolge eingehende Klicks von Affiliate-Referer-Links, die Integration der Auftragsverfolgung in MarketPress, bezahlte Bloghosting-Anmeldungen und bezahlte Mitgliedschaftsanmeldungen.**
 
+Die geplante technische und sicherheitsbezogene Weiterentwicklung ist in der [Modernisierungsroadmap](./MODERNIZATION-ROADMAP.md) dokumentiert.
+
+## Automatisierte Tests
+
+Die Integrationstests verwenden PHPUnit und die offizielle WordPress-Test-Suite mit einer separaten, ausschließlich für Tests bestimmten Datenbank.
+
+```bash
+composer install
+bin/install-wp-tests.sh wordpress_test root '' 127.0.0.1 7.1.4
+composer test
+composer test:multisite
+```
+
+Die Datenbank darf keine produktiven Daten enthalten, da die WordPress-Test-Suite ihre Tabellen während der Ausführung zurücksetzt. In CI laufen die Tests reproduzierbar mit WordPress 7.1.4 sowie PHP 7.4 und 8.2 jeweils als Single-Site und Multisite.
 
 ## Affiliates boosts business by making all your users a part of your marketing team.
 

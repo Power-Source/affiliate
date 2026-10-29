@@ -56,7 +56,7 @@ class affiliate_debugger {
 			<p>
 				<strong><?php _e( 'Partnerprogramm Debug : ', 'affiliate' ); ?></strong>
 				<?php
-				echo $this->debug_message();
+				echo wp_kses_post( $this->debug_message() );
 				?>
 			</p>
 		</div>
@@ -68,7 +68,7 @@ class affiliate_debugger {
 
 		if ( isset( $_COOKIE[ 'affiliate_' . COOKIEHASH ] ) ) {
 
-			$hash    = addslashes( $_COOKIE[ 'affiliate_' . COOKIEHASH ] );
+			$hash    = sanitize_text_field( wp_unslash( $_COOKIE[ 'affiliate_' . COOKIEHASH ] ) );
 			$user_id = $this->db->get_var( $this->db->prepare( "SELECT user_id FROM {$this->db->usermeta} WHERE meta_key = 'affiliate_hash' AND meta_value = %s", $hash ) );
 
 			$aff_user_login = "UNKNOWN";

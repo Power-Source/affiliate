@@ -23,6 +23,15 @@ Deinen Besuchern einen Anteil am Gewinn zu bieten, indem sie für Deine Webseite
 [Projektseite](https://cp-psource.github.io/affiliate/)
 [GitHub](https://github.com/piestingtal-source/affiliate)
 
+== Development ==
+
+Die PHPUnit-Integrationstests verwenden eine separate WordPress-Testdatenbank und laufen als Single-Site und Multisite:
+
+`composer install`
+`bin/install-wp-tests.sh wordpress_test root '' 127.0.0.1 7.1.4`
+`composer test`
+`composer test:multisite`
+
 == ChangeLog ==
 
 = 1.0.0 =

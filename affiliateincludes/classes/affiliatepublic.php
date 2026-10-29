@@ -22,7 +22,10 @@ class affiliate {
 
 	var $onmu = false;
 
-	function __construct() {
+	var $repository;
+	var $transaction_service;
+
+	function __construct( $repository = null, $transaction_service = null ) {
 
 		global $wpdb;
 
@@ -44,6 +47,14 @@ class affiliate {
 				}
 			}
 		}
+
+		$this->repository = $repository ? $repository : new Affiliate_Repository(
+			$this->db,
+			$this->affiliatedata,
+			$this->affiliatereferrers,
+			$this->affiliaterecords
+		);
+		$this->transaction_service = $transaction_service ? $transaction_service : new Affiliate_Transaction_Service( $this->repository );
 
 		//$installed = aff_get_option('Aff_Installed', false);
 
@@ -85,6 +96,14 @@ class affiliate {
 
 	function affiliatelite() {
 		$this->__construct();
+	}
+
+	function get_repository() {
+		return $this->repository;
+	}
+
+	function get_transaction_service() {
+		return $this->transaction_service;
 	}
 
 	function install() {
@@ -346,23 +365,8 @@ class affiliate {
 	}
 
 	function get_affiliate_user_id_from_hash() {
-
-		//echo 'in '. __FUNCTION__ .': '. __LINE__ .'<br />';
-
-		//echo "_COOKIE<pre>"; print_r($_COOKIE); echo "</pre>";
-		//echo "COOKIEHASH[". COOKIEHASH ."]<br />";
-
-		if ( isset( $_COOKIE[ 'affiliate_' . COOKIEHASH ] ) ) {
-			// Get the cookie hash so we know who the referrer is
-			$hash = addslashes( $_COOKIE[ 'affiliate_' . COOKIEHASH ] );
-			//echo "hash[". $hash ."]<br />";
-			$sql_str = $this->db->prepare( "SELECT user_id FROM {$this->db->usermeta} WHERE meta_key = 'affiliate_hash' AND meta_value = %s", $hash );
-			//echo "sql_str[". $sql_str ."]<br />";
-			//die();
-			return $this->db->get_var( $sql_str );
-		} //else {
-		//	echo "COOKIE not set<br />";
-		//}
+		$hash = Affiliate_Request_Context::from_globals()->affiliate_hash();
+		return $hash ? $this->repository->find_user_by_meta( 'affiliate_hash', $hash ) : false;
 	}
 
 	// Recording of affiliate information
@@ -372,31 +376,15 @@ class affiliate {
 			$affiliate_user_id = $this->get_affiliate_user_id_from_hash();
 		}
 
-		if ( $affiliate_user_id ) {
-
-			// Record the click in the affiliate table - v0.2+
-			$period = date( 'Ym' );
-			$sql = $this->db->prepare( "INSERT INTO {$this->affiliatedata} (user_id, period, uniques, credits, lastupdated) VALUES (%d, %s, %d, %f, now()) ON DUPLICATE KEY UPDATE uniques = uniques + %d, credits = credits + %f", $affiliate_user_id, $period, 1, $amount, 1, $amount );
-
-			$queryresult = $this->db->query( $sql );
-
-			if ( $area !== false ) {
-				$args = array(
-					'user_id'       => $affiliate_user_id,
-					'period'        => $period,
-					'affiliatearea' => $area,
-					'area_id'       => $area_id,
-					'affiliatenote' => $note,
-					'amount'        => $amount,
-					'meta'          => maybe_serialize( $meta ),
-					'timestamp'     => current_time( 'mysql', true )
-				);
-				//echo "args<pre>"; print_r($args); echo "</pre>";
-
-				$this->db->insert( $this->affiliaterecords, $args );
-				//echo "db<pre>"; print_r($this->db); echo "</pre>";
-			}
-		}
+		return $this->transaction_service->record(
+			Affiliate_Transaction::TYPE_CLICK,
+			$affiliate_user_id,
+			$amount,
+			$area,
+			$area_id,
+			$note,
+			$meta
+		);
 	}
 
 	function record_signup( $affiliate_user_id = false, $amount = false, $area = false, $area_id = false, $note = false, $meta = false ) {
@@ -409,29 +397,23 @@ class affiliate {
 			}
 		}
 
-		if ( $affiliate_user_id ) {
-
-			$period = date( 'Ym' );
-
-			$sql         = $this->db->prepare( "INSERT INTO {$this->affiliatedata} (user_id, period, signups, credits, lastupdated) VALUES (%d, %s, %d, %f, now()) ON DUPLICATE KEY UPDATE signups = signups + %d, credits = credits + %f", $affiliate_user_id, $period, 1, $amount, 1, $amount );
-			$queryresult = $this->db->query( $sql );
-
-			if ( ! defined( 'AFFILIATEID' ) ) {
-				define( 'AFFILIATEID', $affiliate_user_id );
-			}
-			if ( ! empty( $area ) && $area !== false ) {
-				$this->db->insert( $this->affiliaterecords, array(
-					'user_id'       => $affiliate_user_id,
-					'period'        => $period,
-					'affiliatearea' => $area,
-					'area_id'       => $area_id,
-					'affiliatenote' => $note,
-					'amount'        => $amount,
-					'meta'          => maybe_serialize( $meta ),
-					'timestamp'     => current_time( 'mysql', true )
-				) );
-			}
+		if ( ! $affiliate_user_id ) {
+			return false;
 		}
+
+		if ( ! defined( 'AFFILIATEID' ) ) {
+			define( 'AFFILIATEID', $affiliate_user_id );
+		}
+
+		return $this->transaction_service->record(
+			Affiliate_Transaction::TYPE_SIGNUP,
+			$affiliate_user_id,
+			$amount,
+			$area,
+			$area_id,
+			$note,
+			$meta
+		);
 	}
 
 	function record_purchase( $affiliate_user_id = false, $amount = false, $area = false, $area_id = false, $note = false, $meta = false ) {
@@ -440,113 +422,63 @@ class affiliate {
 			$affiliate_user_id = $this->get_affiliate_user_id_from_hash();
 		}
 
-		if ( ! ( empty( $affiliate_user_id ) ) && ( is_numeric( $affiliate_user_id ) ) ) {
-
-			$period = date( 'Ym' );
-
-			// Need to get the amount paid and calculate the commision
-			$amount = number_format( $amount, 2, '.', '' );
-
-			$sql = $this->db->prepare( "INSERT INTO {$this->affiliatedata} (user_id, period, completes, credits, lastupdated) VALUES (%d, %s, %d, %f, now()) ON DUPLICATE KEY UPDATE completes = completes + %d, credits = credits + %f ", $affiliate_user_id, $period, 1, $amount, 1, $amount );
-			//echo "sql[". $sql ."]<br />";
-			$queryresult = $this->db->query( $sql );
-
-			if ( ! empty( $area ) && $area !== false ) {
-				$this->db->insert( $this->affiliaterecords, array(
-					'user_id'       => $affiliate_user_id,
-					'period'        => $period,
-					'affiliatearea' => $area,
-					'area_id'       => $area_id,
-					'affiliatenote' => $note,
-					'amount'        => $amount,
-					'meta'          => maybe_serialize( $meta ),
-					'timestamp'     => current_time( 'mysql', true )
-				) );
-			}
-			//die();
-		}
+		return $this->transaction_service->record(
+			Affiliate_Transaction::TYPE_PURCHASE,
+			$affiliate_user_id,
+			$amount,
+			$area,
+			$area_id,
+			$note,
+			$meta
+		);
 	}
 
 
 	function record_credit( $affiliate_user_id, $amount = false ) {
 
-		if ( ! empty( $affiliate_user_id ) && is_numeric( $affiliate_user_id ) && $amount ) {
-
-			$period = date( 'Ym' );
-
-			// Need to get the amount paid and calculate the commision
-			$amount = number_format( $amount, 2, '.', '' );
-
-			$sql         = $this->db->prepare( "INSERT INTO {$this->affiliatedata} (user_id, period, credits, lastupdated) VALUES (%d, %s, %f, now()) ON DUPLICATE KEY UPDATE credits = credits + %f ", $affiliate_user_id, $period, $amount, $amount );
-			$queryresult = $this->db->query( $sql );
-
-			$meta = array(
-				'current_user_id' => get_current_user_id(),
-				'LOCAL_URL'       => ( is_ssl() ? 'https://' : 'http://' ) . esc_attr( $_SERVER['HTTP_HOST'] ) . esc_attr( $_SERVER['REQUEST_URI'] ),
-				'IP'              => ( isset( $_SERVER['HTTP_X_FORWARD_FOR'] ) ) ? esc_attr( $_SERVER['HTTP_X_FORWARD_FOR'] ) : esc_attr( $_SERVER['REMOTE_ADDR'] ),
-				//'HTTP_USER_AGENT'	=>	esc_attr($_SERVER['HTTP_USER_AGENT'])
-			);
-
-			$this->db->insert( $this->affiliaterecords, array(
-				'user_id'       => $affiliate_user_id,
-				'period'        => $period,
-				'affiliatearea' => 'credit',
-				'area_id'       => false,
-				'affiliatenote' => false,
-				'amount'    => $amount,
-				'meta'      => maybe_serialize( $meta ),
-				'timestamp' => current_time( 'mysql', true )
-			) );
+		if ( ! $amount ) {
+			return false;
 		}
+
+		$meta = Affiliate_Request_Context::from_globals()->metadata();
+		$meta['current_user_id'] = get_current_user_id();
+
+		return $this->transaction_service->record(
+			Affiliate_Transaction::TYPE_CREDIT,
+			$affiliate_user_id,
+			$amount,
+			'credit',
+			false,
+			false,
+			$meta,
+			true
+		);
 	}
 
 	function record_debit( $affiliate_user_id, $amount = false ) {
 
-		if ( ! empty( $affiliate_user_id ) && is_numeric( $affiliate_user_id ) && $amount ) {
-
-			$period = date( 'Ym' );
-
-			// Need to get the amount paid and calculate the commision
-			$amount = number_format( $amount, 2, '.', '' );
-
-			$sql         = $this->db->prepare( "INSERT INTO {$this->affiliatedata} (user_id, period, debits, lastupdated) VALUES (%d, %s, %f, now()) ON DUPLICATE KEY UPDATE debits = debits + %f ", $affiliate_user_id, $period, $amount, $amount );
-			$queryresult = $this->db->query( $sql );
-
-			$meta = array(
-				'current_user_id' => get_current_user_id(),
-				'LOCAL_URL'       => ( is_ssl() ? 'https://' : 'http://' ) . esc_attr( $_SERVER['HTTP_HOST'] ) . esc_attr( $_SERVER['REQUEST_URI'] ),
-				'IP'              => ( isset( $_SERVER['HTTP_X_FORWARD_FOR'] ) ) ? esc_attr( $_SERVER['HTTP_X_FORWARD_FOR'] ) : esc_attr( $_SERVER['REMOTE_ADDR'] ),
-				//'HTTP_USER_AGENT'	=>	esc_attr($_SERVER['HTTP_USER_AGENT'])
-			);
-			$this->db->insert( $this->affiliaterecords, array(
-				'user_id'       => $affiliate_user_id,
-				'period'        => $period,
-				'affiliatearea' => 'debit',
-				'area_id'       => false,
-				'affiliatenote' => false,
-				'amount'    => $amount,
-				'meta'      => maybe_serialize( $meta ),
-				'timestamp' => current_time( 'mysql', true )
-			) );
-			//echo "db<pre>"; print_r($this->db); echo "</pre>";
-			//die();
+		if ( ! $amount ) {
+			return false;
 		}
+
+		$meta = Affiliate_Request_Context::from_globals()->metadata();
+		$meta['current_user_id'] = get_current_user_id();
+
+		return $this->transaction_service->record(
+			Affiliate_Transaction::TYPE_DEBIT,
+			$affiliate_user_id,
+			$amount,
+			'debit',
+			false,
+			false,
+			$meta,
+			true
+		);
 	}
 
 	function record_referrer( $affiliate_user_id, $url = false ) {
 
-		if ( ! empty( $affiliate_user_id ) && is_numeric( $affiliate_user_id ) && $url ) {
-
-			$period = date( 'Ym' );
-
-			// Need to get the amount paid and calculate the commision
-			//$amount = number_format($amount, 2, '.', '');
-
-			$sql = $this->db->prepare( "INSERT INTO {$this->affiliatereferrers} (user_id, period, url, referred) VALUES (%d, %s, %s, %d) ON DUPLICATE KEY UPDATE referred = referred + %d ", $affiliate_user_id, $period, $url, 1, 1 );
-
-			$queryresult = $this->db->query( $sql );
-
-		}
+		return $this->transaction_service->record_referrer( $affiliate_user_id, $url );
 	}
 
 
@@ -568,7 +500,7 @@ class affiliate {
 		}
 
 		// set the reference
-		$reference = isset( $_GET['ref'] ) ? $_GET['ref'] : false;
+		$reference = isset( $_GET['ref'] ) ? sanitize_text_field( wp_unslash( $_GET['ref'] ) ) : false;
 
 		// set the referer, if we have one
 		if ( isset( $_SERVER['HTTP_REFERER'] ) ) {
@@ -637,13 +569,11 @@ class affiliate {
 				do_action( 'affiliate_referrer', $affiliate, $referrer );
 
 				// Write the affiliate hash out - valid for 30 days.
-				if ( ! headers_sent() ) {
-					@setcookie( 'affiliate_' . COOKIEHASH, 'aff' . md5( AUTH_SALT . $reference ),
-					( time() + ( 60 * 60 * 24 * ( (int) AFFILIATE_COOKIE_DAYS ) ) ),
-					COOKIEPATH,
-					COOKIE_DOMAIN
-					);
-				}
+				affiliate_set_tracking_cookie(
+					'affiliate_' . COOKIEHASH,
+					'aff' . md5( AUTH_SALT . $reference ),
+					time() + ( DAY_IN_SECONDS * (int) AFFILIATE_COOKIE_DAYS )
+				);
 
 			}
 
@@ -656,9 +586,7 @@ class affiliate {
 			// everything failed, we don't have a reference
 			if ( defined( 'AFFILIATE_SETNOCOOKIE' ) && AFFILIATE_SETNOCOOKIE == 'yes' ) {
 				// we are supposed to set a no-affiliate cookie
-				if ( ! headers_sent() ) {
-					@setcookie( 'noaffiliate_' . COOKIEHASH, 'notanaff', 0, COOKIEPATH, COOKIE_DOMAIN );
-				}
+				affiliate_set_tracking_cookie( 'noaffiliate_' . COOKIEHASH, 'notanaff' );
 			}
 		}
 	}
@@ -712,7 +640,11 @@ class affiliate {
 		do_action( 'affiliate_referrer', $affiliate, $referrer );
 
 		// Write the affiliate hash out - valid for 30 days.
-		@setcookie( 'affiliate_' . COOKIEHASH, 'aff' . md5( AUTH_SALT . $reference ), ( time() + ( 60 * 60 * 24 * ( (int) AFFILIATE_COOKIE_DAYS ) ) ), COOKIEPATH, COOKIE_DOMAIN );
+		affiliate_set_tracking_cookie(
+			'affiliate_' . COOKIEHASH,
+			'aff' . md5( AUTH_SALT . $reference ),
+			time() + ( DAY_IN_SECONDS * (int) AFFILIATE_COOKIE_DAYS )
+		);
 
 	}
 
@@ -752,31 +684,38 @@ class affiliate {
 	}
 
 	function get_complete_records( $user_id, $period = false, $area = array(), $area_id = false ) {
-		$sql_str = "SELECT * FROM " . $this->affiliaterecords . " WHERE `user_id`=" . $user_id;
-		if ( ! empty( $period ) ) {
-			$sql_str .= " AND `period`='" . $period . "' ";
+		$user_id = absint( $user_id );
+		if ( ! $user_id ) {
+			return array();
 		}
 
-		if ( ! empty( $area ) ) {
-			$area_str = '';
-			foreach ( $area as $area_item ) {
-				if ( ! empty( $area_str ) ) {
-					$area_str .= ',';
-				}
-				$area_str .= "'" . $area_item . "'";
+		$sql_str = "SELECT * FROM {$this->affiliaterecords} WHERE `user_id` = %d";
+		$sql_args = array( $user_id );
+
+		if ( ! empty( $period ) ) {
+			$period = sanitize_text_field( $period );
+			if ( ! preg_match( '/^\d{6}$/', $period ) ) {
+				return array();
 			}
-			if ( ! empty( $area_str ) ) {
-				$sql_str .= " AND `affiliatearea` IN (" . $area_str . ") ";
-			}
+
+			$sql_str .= ' AND `period` = %s';
+			$sql_args[] = $period;
 		}
+
+		$area = array_values( array_filter( array_map( 'sanitize_text_field', (array) $area ) ) );
+		if ( ! empty( $area ) ) {
+			$sql_str .= ' AND `affiliatearea` IN (' . implode( ', ', array_fill( 0, count( $area ), '%s' ) ) . ')';
+			$sql_args = array_merge( $sql_args, $area );
+		}
+
 		if ( ! empty( $area_id ) ) {
-			$sql_str .= " AND `area_id`='" . $area_id . "' ";
+			$sql_str .= ' AND `area_id` = %s';
+			$sql_args[] = sanitize_text_field( $area_id );
 		}
 
 		$sql_str .= ' LIMIT 50';
 
-		//echo "sql_str[". $sql_str ."]<br />";
-		return $this->db->get_results( $sql_str );
+		return $this->db->get_results( $this->db->prepare( $sql_str, $sql_args ) );
 	}
 
 }

@@ -578,14 +578,15 @@ class affiliateshortcodes {
 
 		$headings = aff_get_option('affiliateheadings', array( __('Einzigartige Klicks','affiliate'), __('Registrierungen','affiliate'), __('Bezahlte Mitglieder','affiliate')));
 
-		if(isset($_GET['number'])) {
-			$number = intval(addslashes($_GET['number']));
-		} else {
-			$number = 18;
-		}
+		$number = isset( $_GET['number'] ) ? absint( $_GET['number'] ) : 18;
+		$number = max( 1, min( 36, $number ) );
 
 		if(isset($_GET['userid'])) {
-			$user_ID = intval(addslashes($_GET['userid']));
+			$requested_user_id = absint( $_GET['userid'] );
+			if ( $requested_user_id !== $user_ID && ! affiliate_can_manage() ) {
+				wp_send_json_error( array( 'message' => __( 'Unzulässige Benutzerabfrage.', 'affiliate' ) ), 403 );
+			}
+			$user_ID = $requested_user_id;
 		}
 
 		$results = $this->db->get_results( $this->db->prepare( "SELECT * FROM {$this->affiliatedata} WHERE user_id = %d ORDER BY period DESC LIMIT 0, %d", $user_ID, $number ) );
@@ -655,10 +656,21 @@ class affiliateshortcodes {
 		$years = array();
 		for($n = 0; $n < 18; $n++) {
 			$rdate = strtotime("-$n month", $startat);
-			$years[] = "'" . date('Ym', $rdate) . "'";
+			$years[] = date('Ym', $rdate);
 		}
 
-		$sql_str = $this->db->prepare( "SELECT ar.* FROM {$this->affiliatereferrers} as ar INNER JOIN ( SELECT url FROM {$this->affiliatereferrers} WHERE user_id = $user_ID AND period in (" . implode(',', $years) . ") GROUP BY url ORDER BY sum(referred) DESC LIMIT 0, 10 ) as arr ON ar.url = arr.url WHERE ar.user_id = %d ORDER BY ar.url, ar.period DESC", $user_ID );
+		$period_placeholders = implode( ', ', array_fill( 0, count( $years ), '%s' ) );
+		$sql_args = array_merge( array( $user_ID ), $years, array( $user_ID ) );
+		$sql_str = $this->db->prepare(
+			"SELECT ar.* FROM {$this->affiliatereferrers} AS ar
+			INNER JOIN (
+				SELECT url FROM {$this->affiliatereferrers}
+				WHERE user_id = %d AND period IN ($period_placeholders)
+				GROUP BY url ORDER BY SUM(referred) DESC LIMIT 0, 10
+			) AS arr ON ar.url = arr.url
+			WHERE ar.user_id = %d ORDER BY ar.url, ar.period DESC",
+			$sql_args
+		);
 
 		$visitresults = $this->db->get_results( $sql_str );
 
@@ -716,40 +728,14 @@ class affiliateshortcodes {
 	}
 
 	function return_json($results) {
-
-		// Check for callback
-		if(isset($_GET['callback'])) {
-			// Add the relevant header
-			header('Content-type: text/javascript');
-			echo addslashes($_GET['callback']) . " (";
-		} else {
-			if(isset($_GET['pretty'])) {
-				// Will output pretty version
-				header('Content-type: text/html');
-			} else {
-				header('Content-type: application/json');
-			}
-		}
-
-		if(function_exists('json_encode')) {
-			echo json_encode($results);
-		} else {
-			// PHP4 version
-			require_once(ABSPATH."wp-includes/js/tinymce/plugins/spellchecker/classes/utils/JSON.php");
-			$json_obj = new Moxiecode_JSON();
-			echo $json_obj->encode($results);
-		}
-
-		if(isset($_GET['callback'])) {
-			echo ")";
-		}
-
+		wp_send_json( $results );
 	}
 
 	function aff_report_header() {
 
 		// Main user report page
-		if(isset($_GET['page']) && addslashes($_GET['page']) == 'affiliateearnings') {
+		$request_page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
+		if ( 'affiliateearnings' === $request_page ) {
 			wp_enqueue_script('flot_js', affiliate_url('affiliateincludes/js/jquery.flot.min.js'), array('jquery'));
 			wp_enqueue_script('aff_js', affiliate_url('affiliateincludes/js/affiliateliteuserreport.js'), array('jquery'));
 
@@ -757,7 +743,8 @@ class affiliateshortcodes {
 		}
 
 		// Admin user report page
-		if( (isset($_GET['page']) && addslashes($_GET['page']) == 'affiliatesadmin') && (isset($_GET['subpage']) && addslashes($_GET['subpage']) == 'users') && isset($_GET['id'])) {
+		$request_subpage = isset( $_GET['subpage'] ) ? sanitize_key( wp_unslash( $_GET['subpage'] ) ) : '';
+		if ( 'affiliatesadmin' === $request_page && 'users' === $request_subpage && isset( $_GET['id'] ) ) {
 			wp_enqueue_script('flot_js', affiliate_url('affiliateincludes/js/jquery.flot.min.js'), array('jquery'));
 			wp_enqueue_script('aff_js', affiliate_url('affiliateincludes/js/affiliateadminuserreport.js'), array('jquery'));
 
@@ -1103,12 +1090,18 @@ class affiliateshortcodes {
 		$years = array();
 		for($n = 0; $n < 18; $n++) {
 			$rdate = strtotime("-$n month", $startat);
-			$years[] = "'" . date('Ym', $rdate) . "'";
+			$years[] = date( 'Ym', $rdate );
 		}
 
                 $schema = is_ssl() ? 'https://' : 'http://';
 
-		$rows = $this->db->get_results( $this->db->prepare( "SELECT url, SUM(referred) as totalreferred FROM {$this->affiliatereferrers} WHERE user_id = %d AND period in (" . implode(',', $years) . ") GROUP BY url ORDER BY totalreferred DESC LIMIT 0, 15", $user_ID ) );
+		$year_placeholders = implode( ', ', array_fill( 0, count( $years ), '%s' ) );
+		$rows = $this->db->get_results(
+			$this->db->prepare(
+				"SELECT url, SUM(referred) AS totalreferred FROM {$this->affiliatereferrers} WHERE user_id = %d AND period IN ($year_placeholders) GROUP BY url ORDER BY totalreferred DESC LIMIT 0, 15",
+				array_merge( array( $user_ID ), $years )
+			)
+		);
 		echo "<div id='topvisitstable' style=''>";
 		echo "<table class='widefat'>";
 
@@ -1246,15 +1239,19 @@ class affiliateshortcodes {
 
 		ob_start();
 
-		if(isset($_POST['action']) && addslashes($_POST['action']) == 'update') {
+		$profile_action = isset( $_POST['action'] ) ? sanitize_key( wp_unslash( $_POST['action'] ) ) : '';
+		if ( 'update' === $profile_action ) {
 
 			check_admin_referer("affiliatepublicsettings-" . $user_ID);
 
-			update_user_meta($user_ID, 'enable_affiliate', $_POST['enable_affiliate']);
-			update_user_meta($user_ID, 'affiliate_paypal', $_POST['affiliate_paypal']);
-			if(isset($_POST['affiliate_referrer'])) {
+			$enable_affiliate = isset( $_POST['enable_affiliate'] ) && 'yes' === sanitize_key( wp_unslash( $_POST['enable_affiliate'] ) ) ? 'yes' : 'no';
+			$paypal_email = isset( $_POST['affiliate_paypal'] ) ? sanitize_email( wp_unslash( $_POST['affiliate_paypal'] ) ) : '';
+			update_user_meta( $user_ID, 'enable_affiliate', $enable_affiliate );
+			update_user_meta( $user_ID, 'affiliate_paypal', $paypal_email );
+			if ( ! empty( $_POST['affiliate_referrer'] ) ) {
 
-				$url = str_replace(array('http://', 'https://'), '', untrailingslashit($_POST['affiliate_referrer']));
+				$referrer_url = esc_url_raw( wp_unslash( $_POST['affiliate_referrer'] ) );
+				$url = preg_replace( '#^https?://#i', '', untrailingslashit( $referrer_url ) );
 				// store the update - even though it could be wrong
 				update_user_meta($user_ID, 'affiliate_referrer', $url );
 				// Remove any validated referrers as it may have been changed
@@ -1269,7 +1266,7 @@ class affiliateshortcodes {
 					$chkmsg = '';
 					// Check a file with it exists and contains the content
 					if(defined('AFFILIATE_VALIDATE_REFERRER_URLS') && AFFILIATE_VALIDATE_REFERRER_URLS == 'yes' ) {
-						$referrer = $_POST['affiliate_referrer'];
+						$referrer = $referrer_url;
 						$filename = md5('affiliatefilename-' . $user_ID . '-' . $user->user_login . "-" . $referrer) . '.html';
 
 						if($this->validate_url_for_file( trailingslashit($url), $filename)) {
@@ -1286,7 +1283,7 @@ class affiliateshortcodes {
 				delete_user_meta($user_ID, 'affiliate_referrer_validated');
 				delete_user_meta($user_ID, 'affiliate_referrer');
 			}
-			if(isset($_POST['enable_affiliate']) && addslashes($_POST['enable_affiliate']) == 'yes') {
+			if ( 'yes' === $enable_affiliate ) {
 				// Set up the affiliation details
 				// Store a record of the reference
 				$reference = aff_build_reference( $user );
@@ -1320,7 +1317,7 @@ class affiliateshortcodes {
 		<p>Als Dankeschön möchten wir etwas zurückgeben, weshalb wir dieses Partnerprogramm eingerichtet haben.</p>
 		<p>Um zu beginnen, aktiviere einfach die Links für Dein Konto und gib unten Deine PayPal-E-Mail-Adresse ein. Weitere Informationen zu unserem Partnerprogramm findest Du auf unserer Hauptseite.</p>";
 
-			echo stripslashes( aff_get_option('affiliatesettingstext', $settingstextdefault) );
+			echo wp_kses_post( stripslashes( aff_get_option('affiliatesettingstext', $settingstextdefault) ) );
 
 			?>
 
@@ -1383,7 +1380,7 @@ class affiliateshortcodes {
 								<?php echo is_ssl() ? 'https' : 'http'; ?>://&nbsp;<input type="text" name="affiliate_referrer" id="affiliate_referrer" value="<?php echo esc_attr(get_user_meta($user_ID, 'affiliate_referrer', true)); ?>" class="regular-text" />
 								<?php 	echo "&nbsp;&nbsp;";
 								 		if (isset($msg)) {
-											echo $msg;
+											echo wp_kses_post( $msg );
 										}
 								?>
 								<?php
@@ -1544,7 +1541,7 @@ class affiliateshortcodes {
 			// Trim the array so that it removes none text characters
 			array_map('trim', $advbanner);
 			?>
-			<img src='<?php echo $advbanner[0]; ?>' />
+			<img src='<?php echo esc_url( $advbanner[0] ); ?>' />
 			<br/><br/>
 			<textarea cols='80' rows='5'><?php
 				echo sprintf("<a href='%s?ref=%s'>\n", $advbanner[1], $reference);

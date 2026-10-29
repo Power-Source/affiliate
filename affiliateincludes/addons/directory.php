@@ -113,7 +113,7 @@ function dr_affiliate_settings( $affiliate_settings ) {
         <table class="table">
             <tr>
                 <td>
-                    <label for="aff_pay"><?php echo $affiliate_settings['dr_labels_txt']['recurring']; ?></label>
+                    <label for="aff_pay"><?php echo esc_html( $affiliate_settings['dr_labels_txt']['recurring'] ); ?></label>
                 </td>
               </tr>
               <tr>
@@ -146,7 +146,7 @@ function dr_affiliate_settings( $affiliate_settings ) {
             <tr>
                 <td>
                     <br /><br />
-                    <label for="aff_pay"><?php echo $affiliate_settings['dr_labels_txt']['one_time']; ?></label>
+                    <label for="aff_pay"><?php echo esc_html( $affiliate_settings['dr_labels_txt']['one_time'] ); ?></label>
                 </td>
                 </tr>
                 <tr>

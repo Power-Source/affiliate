@@ -60,19 +60,19 @@ function aff_mp3_show_metabox( $post ) {
 			if ( affiliate_is_plugin_active_for_network() ) {
 				if ( current_user_can( 'manage_network_options' ) ) {
 					?><p><?php _e( 'Partnerprogramm Benutzer', 'affiliate' ) ?> <a
-						href="<?php echo network_admin_url( 'admin.php?page=affiliatesadminmanage&subpage=details&id=' . $user->ID ); ?>"><?php echo $user->display_name; ?>
-						(<?php echo $user->user_email; ?>)</a></p><?php
+						href="<?php echo esc_url( network_admin_url( 'admin.php?page=affiliatesadminmanage&subpage=details&id=' . $user->ID ) ); ?>"><?php echo esc_html( $user->display_name ); ?>
+						(<?php echo esc_html( $user->user_email ); ?>)</a></p><?php
 				} else {
-					?><p><?php echo $user->display_name; ?></p><?php
+					?><p><?php echo esc_html( $user->display_name ); ?></p><?php
 				}
 
 			} else {
 				if ( current_user_can( 'edit_others_posts' ) ) {
 					?><p><?php _e( 'Partnerprogramm Benutzer', 'affiliate' ) ?> <a
-						href="<?php echo admin_url( 'admin.php?page=affiliatesadminmanage&subpage=details&id=' . $user->ID ); ?>"><?php echo $user->display_name; ?>
-						(<?php echo $user->user_email; ?>)</a></p><?php
+						href="<?php echo esc_url( admin_url( 'admin.php?page=affiliatesadminmanage&subpage=details&id=' . $user->ID ) ); ?>"><?php echo esc_html( $user->display_name ); ?>
+						(<?php echo esc_html( $user->user_email ); ?>)</a></p><?php
 				} else {
-					?><p><?php echo $user->display_name; ?></p><?php
+					?><p><?php echo esc_html( $user->display_name ); ?></p><?php
 				}
 			}
 
@@ -236,6 +236,9 @@ function affiliate_marketpress_paid_order( $order ) {
 	$affiliate_user_id = $shipping_info['affiliate_referrer'];
 
 	if ( ! empty( $affiliate_user_id ) ) {
+		if ( affiliate_has_commission_record( $affiliate_user_id, 'paid:marketpress', $order->ID ) ) {
+			return;
+		}
 
 		// We have a referrer - get the total
 		//$total_amount = get_post_meta($order->ID, 'mp_order_total', true);
@@ -319,19 +322,19 @@ function affiliate_marketpress_display_metabox( $order ) {
 						if ( affiliate_is_plugin_active_for_network() ) {
 							if ( current_user_can( 'manage_network_options' ) ) {
 								?><p><?php _e( 'Partnerprogramm Benutzer', 'affiliate' ) ?> <a
-									href="<?php echo network_admin_url( 'admin.php?page=affiliatesadminmanage&subpage=details&id=' . $user->ID ); ?>"><?php echo $user->display_name; ?>
-									(<?php echo $user->user_email; ?>)</a></p><?php
+									href="<?php echo esc_url( network_admin_url( 'admin.php?page=affiliatesadminmanage&subpage=details&id=' . $user->ID ) ); ?>"><?php echo esc_html( $user->display_name ); ?>
+									(<?php echo esc_html( $user->user_email ); ?>)</a></p><?php
 							} else {
-								?><p><?php echo $user->display_name; ?></p><?php
+								?><p><?php echo esc_html( $user->display_name ); ?></p><?php
 							}
 
 						} else {
 							if ( current_user_can( 'edit_others_posts' ) ) {
 								?><p><?php _e( 'Partnerprogramm Benutzer', 'affiliate' ) ?> <a
-									href="<?php echo admin_url( 'admin.php?page=affiliatesadminmanage&subpage=details&id=' . $user->ID ); ?>"><?php echo $user->display_name; ?>
-									(<?php echo $user->user_email; ?>)</a></p><?php
+									href="<?php echo esc_url( admin_url( 'admin.php?page=affiliatesadminmanage&subpage=details&id=' . $user->ID ) ); ?>"><?php echo esc_html( $user->display_name ); ?>
+									(<?php echo esc_html( $user->user_email ); ?>)</a></p><?php
 							} else {
-								?><p><?php echo $user->display_name; ?></p><?php
+								?><p><?php echo esc_html( $user->display_name ); ?></p><?php
 							}
 						}
 
@@ -350,10 +353,11 @@ function affiliate_marketpress_display_metabox( $order ) {
 
 function affiliate_marketpress_settings( $settings ) {
 
-	if ( isset( $_POST['gateway_settings'] ) ) {
+	if ( isset( $_POST['gateway_settings'] ) && affiliate_can_manage() ) {
 		// Do processing here
-		if ( ! empty( $_POST['affiliate_mp_percentage'] ) && $_POST['affiliate_mp_percentage'] > 0 ) {
-			aff_update_option( 'affiliate_mp_percentage', $_POST['affiliate_mp_percentage'] );
+		$percentage = isset( $_POST['affiliate_mp_percentage'] ) ? min( 100, affiliate_sanitize_decimal( $_POST['affiliate_mp_percentage'] ) ) : 0;
+		if ( $percentage > 0 ) {
+			aff_update_option( 'affiliate_mp_percentage', $percentage );
 		} else {
 			aff_delete_option( 'affiliate_mp_percentage' );
 		}
@@ -382,4 +386,3 @@ function affiliate_marketpress_settings( $settings ) {
 	</div>
 	<?php
 }
-

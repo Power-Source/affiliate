@@ -15,6 +15,12 @@ Domain Path: /affiliateincludes/languages
 
 require_once(plugin_dir_path( __FILE__ ) . 'affiliateincludes/includes/config.php');
 require_once(plugin_dir_path( __FILE__ ) . 'affiliateincludes/includes/functions.php');
+require_once(plugin_dir_path( __FILE__ ) . 'affiliateincludes/core/class-affiliate-money.php');
+require_once(plugin_dir_path( __FILE__ ) . 'affiliateincludes/core/class-affiliate-period.php');
+require_once(plugin_dir_path( __FILE__ ) . 'affiliateincludes/core/class-affiliate-transaction.php');
+require_once(plugin_dir_path( __FILE__ ) . 'affiliateincludes/core/class-affiliate-repository.php');
+require_once(plugin_dir_path( __FILE__ ) . 'affiliateincludes/core/class-affiliate-request-context.php');
+require_once(plugin_dir_path( __FILE__ ) . 'affiliateincludes/core/class-affiliate-transaction-service.php');
 // Set up my location
 set_affiliate_url(__FILE__);
 set_affiliate_dir(__FILE__);
@@ -36,4 +42,3 @@ include_once(plugin_dir_path( __FILE__ ) . 'affiliateincludes/classes/affiliates
 
 $affiliate = new affiliate();
 $affshortcode = new affiliateshortcodes();
-

@@ -326,34 +326,45 @@ class Affiliate_Membership2_Integration {
 	 * @since  1.0.0
 	 */
 	public function save() {
-		if ( empty( $_POST['_wpnonce'] ) ) { exit; }
-		if ( empty( $_POST['field'] ) ) { exit; }
-		if ( ! isset( $_POST['value'] ) ) { exit; }
-		if ( ! isset( $_POST['membership_id'] ) ) { exit; }
+		if ( ! affiliate_can_manage() ) {
+			wp_send_json_error( array( 'message' => __( 'Unzureichende Berechtigung.', 'affiliate' ) ), 403 );
+		}
 
-		if ( ! wp_verify_nonce( $_POST['_wpnonce'], self::AJAX_ACTION ) ) { exit; }
+		check_ajax_referer( self::AJAX_ACTION );
 
-		$membership_id = $_POST['membership_id'];
+		$membership_id = isset( $_POST['membership_id'] ) ? absint( $_POST['membership_id'] ) : 0;
+		$field = isset( $_POST['field'] ) ? sanitize_key( wp_unslash( $_POST['field'] ) ) : '';
+		if ( ! $membership_id || ! in_array( $field, array( 'aff_reward_value', 'aff_reward_type' ), true ) || ! isset( $_POST['value'] ) ) {
+			wp_send_json_error( array( 'message' => __( 'Ungültige Einstellung.', 'affiliate' ) ), 400 );
+		}
+
 		$membership = $this->api->get_membership( $membership_id );
 
-		if ( ! $membership->is_valid() ) { exit; }
+		if ( ! $membership->is_valid() ) {
+			wp_send_json_error( array( 'message' => __( 'Mitgliedschaft nicht gefunden.', 'affiliate' ) ), 404 );
+		}
 
-		$field = $_POST['field'];
-		$value = $_POST['value'];
+		$value = wp_unslash( $_POST['value'] );
 
 		switch ( $field ) {
 			case 'aff_reward_value':
-				$value = floatval( $value );
+				$value = affiliate_sanitize_decimal( $value );
 				$value *= 100;
 				$value = (int) $value;
+				break;
+			case 'aff_reward_type':
+				$value = sanitize_key( $value );
+				if ( ! in_array( $value, array( 'inv', 'mem', 'abs' ), true ) ) {
+					wp_send_json_error( array( 'message' => __( 'Ungültiger Belohnungstyp.', 'affiliate' ) ), 400 );
+				}
 				break;
 		}
 
 		$membership->set_custom_data( $field, $value );
 		$membership->save();
 
-		echo '3'; // 3 means 'OK'
-		exit;
+		echo '3';
+		wp_die();
 	}
 
 	//
