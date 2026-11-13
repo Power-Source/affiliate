@@ -1,7 +1,7 @@
 <?php
 /*
 Plugin Name: PS Affiliate
-Plugin URI: https://cp-psource.github.io/affiliate/
+Plugin URI: https://psource.eimen.net/psource/ps-affiliate/
 Description: Dieses Plugin fügt Deiner Seite ein einfaches Affiliate-System hinzu. Verfolge eingehende Klicks von Affiliate-Referer-Links, die Integration der Auftragsverfolgung in MarketPress, bezahlte Bloghosting-Anmeldungen und bezahlte Mitgliedschaftsanmeldungen.
 Author: DerN3rd (PSOURCE)
 Version: 1.0.0
